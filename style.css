@@ -1,0 +1,25 @@
+html, body {
+  margin: 0;
+  background: #000008;
+  color: #ccc;
+  font-family: sans-serif;
+  overflow: hidden;
+}
+
+#canvas {
+  display: block;
+  margin: 0 auto;
+}
+
+#hud {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  font-size: 14px;
+}
+
+#reset {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+}
