@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>内惑星「法則破壊」シミュレータ — 完成イメージ</title>
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+
+  :root {
+    --void:   #04060e;
+    --panel:  #0a0e19;
+    --line:   #1a2233;
+    --line-2: #263148;
+    --ink:    #e9edf6;
+    --dim:    #79839c;
+    --amber:  #ffd75e;
+    --danger: #c1502e;
+
+    --mono: "SF Mono", "Consolas", "Roboto Mono", ui-monospace, monospace;
+    --sans: "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic",
+            "Noto Sans JP", "Segoe UI", system-ui, sans-serif;
+  }
+
+  /* 宇宙の観測コンソールとして、意図的にダーク単一テーマで作っている */
+  body { background: var(--void); color: var(--ink); font-family: var(--sans); }
+
+  .lab {
+    display: grid;
+    grid-template-columns: minmax(0,1fr) 336px;
+    min-height: 100vh;
+  }
+
+  /* ---------- 左：観測画面 ---------- */
+  .stage { position: relative; min-height: 60vh; }
+  #sky { display: block; width: 100%; height: 100%; position: absolute; inset: 0; }
+
+  .stage-head {
+    position: absolute; top: 20px; left: 24px; z-index: 2;
+    pointer-events: none;
+  }
+  .stage-head h1 {
+    font-size: 15px; font-weight: 600; letter-spacing: .16em;
+    margin-bottom: 6px;
+  }
+  .stage-head p {
+    font-family: var(--mono); font-size: 10.5px; color: var(--dim);
+    letter-spacing: .1em;
+  }
+
+  .readout {
+    position: absolute; left: 24px; bottom: 24px; z-index: 2;
+    display: flex; gap: 26px; align-items: flex-end;
+    font-family: var(--mono); font-variant-numeric: tabular-nums;
+  }
+  .readout dt {
+    font-size: 9px; letter-spacing: .18em; color: var(--dim);
+    margin-bottom: 4px;
+  }
+  .readout dd { font-size: 19px; letter-spacing: .02em; }
+  .readout dd small { font-size: 10px; color: var(--dim); margin-left: 3px; }
+  .broken { color: var(--danger); }
+
+  .graph-wrap {
+    position: absolute; right: 24px; bottom: 24px; z-index: 2;
+    width: 260px;
+  }
+  .graph-wrap h2 {
+    font-family: var(--mono); font-size: 9px; letter-spacing: .18em;
+    color: var(--dim); margin-bottom: 6px;
+  }
+  #energy {
+    display: block; width: 100%; height: 76px;
+    border: 1px solid var(--line);
+    background: rgba(6,9,18,.72);
+  }
+
+  /* ---------- 右：計器パネル ---------- */
+  .rail {
+    background: var(--panel);
+    border-left: 1px solid var(--line);
+    padding: 22px 22px 40px;
+    display: flex; flex-direction: column; gap: 22px;
+    max-height: 100vh; overflow-y: auto;
+  }
+
+  .rail-title {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .22em;
+    color: var(--dim);
+    padding-bottom: 12px; border-bottom: 1px solid var(--line);
+  }
+
+  .laws { display: flex; flex-direction: column; gap: 19px; }
+
+  .law-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 8px;
+  }
+  .law-head .name { font-size: 12.5px; letter-spacing: .04em; }
+  .law-head .val {
+    font-family: var(--mono); font-size: 12px; color: var(--amber);
+    font-variant-numeric: tabular-nums;
+  }
+  .law .note {
+    font-size: 10.5px; line-height: 1.55; color: var(--dim);
+    margin-top: 7px;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; background: transparent; cursor: ew-resize;
+  }
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 3px; background: var(--track, var(--line-2));
+  }
+  input[type=range]::-moz-range-track {
+    height: 3px; background: var(--track, var(--line-2));
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 13px; height: 13px; margin-top: -5px;
+    background: var(--amber); border-radius: 50%;
+    box-shadow: 0 0 0 3px var(--panel);
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 13px; height: 13px; border: none;
+    background: var(--amber); border-radius: 50%;
+    box-shadow: 0 0 0 3px var(--panel);
+  }
+  input[type=range]:focus-visible { outline: none; }
+  input[type=range]:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 3px var(--panel), 0 0 0 5px var(--amber);
+  }
+
+  .presets { display: flex; flex-wrap: wrap; gap: 7px; }
+  .presets button, .transport button {
+    font-family: var(--sans); font-size: 11px; color: var(--ink);
+    background: transparent; border: 1px solid var(--line-2);
+    padding: 6px 11px; cursor: pointer;
+    transition: border-color .15s, color .15s;
+  }
+  .presets button:hover, .transport button:hover {
+    border-color: var(--amber); color: var(--amber);
+  }
+  .presets button:focus-visible, .transport button:focus-visible {
+    outline: 2px solid var(--amber); outline-offset: 2px;
+  }
+  .transport { display: flex; gap: 7px; }
+  .transport button { flex: 1; }
+
+  .legend {
+    display: flex; flex-direction: column; gap: 6px;
+    font-family: var(--mono); font-size: 10px; color: var(--dim);
+    font-variant-numeric: tabular-nums;
+  }
+  .legend div { display: flex; align-items: center; gap: 8px; }
+  .legend i { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .legend span:first-of-type { flex: 1; font-family: var(--sans); font-size: 11px; color: var(--ink); }
+
+  @media (max-width: 900px) {
+    .lab { grid-template-columns: 1fr; }
+    .stage { height: 62vh; }
+    .rail { max-height: none; border-left: none; border-top: 1px solid var(--line); }
+    .graph-wrap { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .presets button, .transport button { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="lab">
+  <section class="stage">
+    <canvas id="sky"></canvas>
+
+    <div class="stage-head">
+      <h1>内惑星「法則破壊」シミュレータ</h1>
+      <p>SUN / MERCURY / VENUS / EARTH / MARS &nbsp;·&nbsp; LEAPFROG dt=1/2000yr</p>
+    </div>
+
+    <dl class="readout">
+      <div>
+        <dt>経過年数</dt>
+        <dd id="years">0.00<small>yr</small></dd>
+      </div>
+      <div>
+        <dt>全エネルギー変化</dt>
+        <dd id="dE">0.000<small>%</small></dd>
+      </div>
+      <div>
+        <dt>FPS</dt>
+        <dd id="fps">60</dd>
+      </div>
+    </dl>
+
+    <div class="graph-wrap">
+      <h2>TOTAL ENERGY</h2>
+      <canvas id="energy"></canvas>
+    </div>
+  </section>
+
+  <aside class="rail">
+    <div class="rail-title">法則パラメータ</div>
+
+    <div class="laws" id="laws"></div>
+
+    <div>
+      <div class="rail-title" style="margin-bottom:12px">プリセット</div>
+      <div class="presets" id="presets"></div>
+    </div>
+
+    <div class="transport">
+      <button id="pause">一時停止</button>
+      <button id="reset">リセット</button>
+    </div>
+
+    <div>
+      <div class="rail-title" style="margin-bottom:12px">太陽からの距離</div>
+      <div class="legend" id="legend"></div>
+    </div>
+  </aside>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ===== 単位系: AU / 年 / 太陽質量 =====
+  const G0 = 4 * Math.PI * Math.PI;
+  const C_LIGHT = 63241.077;
+
+  const ELEMENTS = [
+    { id:'mercury', label:'水星', a:0.38710, e:0.20563, m:1.6601e-7, color:'#a89078', r:3 },
+    { id:'venus',   label:'金星', a:0.72333, e:0.00677, m:2.4478e-6, color:'#e8c07a', r:5 },
+    { id:'earth',   label:'地球', a:1.00000, e:0.01671, m:3.0035e-6, color:'#5b9bd5', r:5 },
+    { id:'mars',    label:'火星', a:1.52368, e:0.09340, m:3.2271e-7, color:'#c1502e', r:4 },
+  ];
+
+  const defaultLaw = {
+    dimension: 3.0, G: G0, gr: 0, gw: 0, lambda: 0, sunMass: 1.0, zoom: 1.0
+  };
+  let law = { ...defaultLaw };
+
+  const SLIDERS = [
+    { key:'dimension', name:'空間の次元', min:2.5, max:4.0, step:0.01, digits:2,
+      danger:(3.0-2.5)/1.5, note:'3を超えると閉じた軌道が存在できなくなる（ベルトラン定理）' },
+    { key:'G', name:'重力の強さ', min:10, max:80, step:0.1, digits:1,
+      note:'既定 39.478 = 4π²。上げれば収縮、下げれば散逸' },
+    { key:'gr', name:'相対論', min:0, max:100000, step:100, digits:0,
+      note:'現実の10万倍に増幅して、ようやく花びら軌道が見える' },
+    { key:'gw', name:'重力波', min:0, max:2, step:0.01, digits:2,
+      note:'エネルギーを失い、螺旋を描いて太陽へ落ちる' },
+    { key:'lambda', name:'宇宙定数', min:0, max:50, step:0.5, digits:1,
+      note:'距離に比例する斥力。外側の惑星から引き剥がされる' },
+    { key:'sunMass', name:'太陽質量', min:0.1, max:3.0, step:0.01, digits:2,
+      note:'減らすと全軌道が一斉に膨張する' },
+    { key:'zoom', name:'表示倍率', min:0.2, max:3.0, step:0.01, digits:2,
+      note:'物理には影響しない。飛んでいった惑星を追うためのもの' },
+  ];
+
+  const PRESETS = {
+    '現実':               {},
+    '4次元宇宙':          { dimension: 4.0, zoom: 0.6 },
+    'ロゼッタ軌道':        { gr: 80000, zoom: 1.6 },
+    '螺旋落下':           { gw: 0.5, zoom: 1.6 },
+    '太陽が痩せる':        { sunMass: 0.4, zoom: 0.45 },
+    '暗黒エネルギー暴走':   { lambda: 30, zoom: 0.5 },
+  };
+
+  // ===== 天体 =====
+  function createBodies() {
+    const bodies = [{
+      id:'sun', label:'太陽', x:0, y:0, vx:0, vy:0,
+      m:1.0, color:'#ffd75e', r:11, a:0, fixed:true, trail:[]
+    }];
+    for (const p of ELEMENTS) {
+      bodies.push({
+        id:p.id, label:p.label,
+        x: p.a * (1 - p.e), y: 0,
+        vx: 0, vy: Math.sqrt(G0 / p.a * (1 + p.e) / (1 - p.e)),
+        m:p.m, color:p.color, r:p.r, a:p.a, fixed:false, trail:[]
+      });
+    }
+    return bodies;
+  }
+
+  // ===== 物理: 法則の改変はすべてこの関数の中で起きる =====
+  function computeAccel(bodies, law) {
+    const n = bodies.length;
+    const acc = bodies.map(() => ({ ax:0, ay:0 }));
+    const exponent = law.dimension - 1;
+
+    for (let i = 1; i < n; i++) {          // 太陽は固定するので i=0 は計算しない
+      const A = bodies[i];
+      for (let j = 0; j < n; j++) {
+        if (i === j) continue;
+        const B = bodies[j];
+        const dx = B.x - A.x, dy = B.y - A.y;
+        const r = Math.sqrt(dx*dx + dy*dy) + 1e-9;
+        const mB = (j === 0) ? B.m * law.sunMass : B.m;
+
+        let a = law.G * mB / Math.pow(r, exponent);
+
+        if (law.gr > 0 && j === 0) {       // 相対論補正は太陽に対してだけ
+          const h = A.x * A.vy - A.y * A.vx;
+          a *= (1 + law.gr * 3 * h * h / (C_LIGHT * C_LIGHT * r * r));
+        }
+        acc[i].ax += a * dx / r;
+        acc[i].ay += a * dy / r;
+      }
+      if (law.lambda !== 0) {              // 宇宙定数: 中心から外向きの斥力
+        acc[i].ax += law.lambda * A.x;
+        acc[i].ay += law.lambda * A.y;
+      }
+      if (law.gw > 0) {                    // 重力波: 速度に比例する減衰
+        acc[i].ax -= law.gw * A.vx;
+        acc[i].ay -= law.gw * A.vy;
+      }
+    }
+    return acc;
+  }
+
+  const DT = 1 / 2000;
+  function stepOnce(bodies, law) {
+    let acc = computeAccel(bodies, law);
+    for (let i = 1; i < bodies.length; i++) {
+      bodies[i].vx += acc[i].ax * DT / 2;
+      bodies[i].vy += acc[i].ay * DT / 2;
+      bodies[i].x  += bodies[i].vx * DT;
+      bodies[i].y  += bodies[i].vy * DT;
+    }
+    acc = computeAccel(bodies, law);
+    for (let i = 1; i < bodies.length; i++) {
+      bodies[i].vx += acc[i].ax * DT / 2;
+      bodies[i].vy += acc[i].ay * DT / 2;
+    }
+  }
+
+  // 次元が3でないとき、逆二乗前提のこの式は意味を持たない
+  function totalEnergy(bodies, law) {
+    if (Math.abs(law.dimension - 3) > 1e-9) return null;
+    let E = 0;
+    for (let i = 1; i < bodies.length; i++) {
+      const b = bodies[i];
+      E += 0.5 * b.m * (b.vx*b.vx + b.vy*b.vy);
+      for (let j = 0; j < bodies.length; j++) {
+        if (j >= i) continue;
+        const dx = bodies[j].x - b.x, dy = bodies[j].y - b.y;
+        const r = Math.sqrt(dx*dx + dy*dy) + 1e-9;
+        const mj = (j === 0) ? bodies[j].m * law.sunMass : bodies[j].m;
+        E -= law.G * b.m * mj / r;
+      }
+    }
+    return E;
+  }
+
+  // ===== UI 生成 =====
+  const railLaws = document.getElementById('laws');
+  const inputs = {};
+
+  function trackStyle(cfg, value) {
+    const t = (value - cfg.min) / (cfg.max - cfg.min) * 100;
+    const stops = [
+      `#ffd75e 0 ${t}%`,
+      `#263148 ${t}% 100%`
+    ];
+    let bg = `linear-gradient(90deg, ${stops.join(',')})`;
+    if (cfg.danger !== undefined) {
+      const d = cfg.danger * 100;
+      bg = `linear-gradient(90deg, rgba(193,80,46,0) 0 ${d}%, rgba(193,80,46,.55) ${d}% 100%), ` + bg;
+    }
+    return bg;
+  }
+
+  for (const cfg of SLIDERS) {
+    const wrap = document.createElement('div');
+    wrap.className = 'law';
+    wrap.innerHTML =
+      '<div class="law-head"><span class="name"></span><span class="val"></span></div>' +
+      '<input type="range">' +
+      '<p class="note"></p>';
+    wrap.querySelector('.name').textContent = cfg.name;
+    wrap.querySelector('.note').textContent = cfg.note;
+    const el = wrap.querySelector('input');
+    el.min = cfg.min; el.max = cfg.max; el.step = cfg.step;
+    el.value = law[cfg.key];
+    el.setAttribute('aria-label', cfg.name);
+    inputs[cfg.key] = { el, out: wrap.querySelector('.val'), cfg };
+    el.addEventListener('input', () => {
+      law[cfg.key] = parseFloat(el.value);
+      syncOne(cfg.key);
+      if (cfg.key !== 'zoom') marks.push(hist.length);   // 壊した瞬間に印を打つ
+    });
+    railLaws.appendChild(wrap);
+  }
+
+  function syncOne(key) {
+    const { el, out, cfg } = inputs[key];
+    el.value = law[key];
+    out.textContent = law[key].toFixed(cfg.digits);
+    el.style.setProperty('--track', trackStyle(cfg, law[key]));
+  }
+  function syncAll() { for (const cfg of SLIDERS) syncOne(cfg.key); }
+
+  const presetBox = document.getElementById('presets');
+  for (const [name, patch] of Object.entries(PRESETS)) {
+    const b = document.createElement('button');
+    b.textContent = name;
+    b.addEventListener('click', () => {
+      law = { ...defaultLaw, ...patch };   // 書かれていない項目は既定に戻す
+      syncAll();
+      reset();
+    });
+    presetBox.appendChild(b);
+  }
+
+  const legendBox = document.getElementById('legend');
+  const legendVals = {};
+  for (const p of ELEMENTS) {
+    const row = document.createElement('div');
+    row.innerHTML = '<i></i><span></span><span class="d"></span>';
+    row.querySelector('i').style.background = p.color;
+    row.querySelectorAll('span')[0].textContent = p.label;
+    legendVals[p.id] = row.querySelector('.d');
+    legendBox.appendChild(row);
+  }
+
+  // ===== 状態 =====
+  let bodies = createBodies();
+  let years = 0, E0 = null, hist = [], marks = [], running = true, broken = false;
+
+  function reset() {
+    bodies = createBodies();
+    years = 0; E0 = null; hist = []; marks = []; broken = false;
+    running = true;
+    document.getElementById('pause').textContent = '一時停止';
+  }
+  document.getElementById('reset').addEventListener('click', reset);
+  document.getElementById('pause').addEventListener('click', (ev) => {
+    running = !running;
+    ev.currentTarget.textContent = running ? '一時停止' : '再開';
+  });
+
+  // ===== 描画 =====
+  const sky = document.getElementById('sky');
+  const ctx = sky.getContext('2d');
+  const graph = document.getElementById('energy');
+  const gctx = graph.getContext('2d');
+  let W = 0, H = 0, GW = 0, GH = 0;
+  const stars = [];
+
+  function fit() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const rect = sky.parentElement.getBoundingClientRect();
+    W = rect.width; H = rect.height;
+    sky.width = W * dpr; sky.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const gr = graph.getBoundingClientRect();
+    GW = gr.width; GH = gr.height;
+    graph.width = GW * dpr; graph.height = GH * dpr;
+    gctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    stars.length = 0;
+    const n = Math.round(W * H / 9000);
+    for (let i = 0; i < n; i++) {
+      stars.push({ x: Math.random()*W, y: Math.random()*H, a: Math.random()*0.5 + 0.08 });
+    }
+    ctx.fillStyle = '#04060e';
+    ctx.fillRect(0, 0, W, H);
+  }
+  window.addEventListener('resize', fit);
+
+  const SCALE_BASE = 220;
+  function sx(x) { return W/2 + x * SCALE_BASE * law.zoom; }
+  function sy(y) { return H/2 - y * SCALE_BASE * law.zoom; }
+
+  function drawSky() {
+    ctx.fillStyle = 'rgba(4,6,14,0.26)';        // 残像を残すため半透明で塗る
+    ctx.fillRect(0, 0, W, H);
+
+    for (const s of stars) {
+      ctx.fillStyle = `rgba(200,214,240,${s.a})`;
+      ctx.fillRect(s.x, s.y, 1, 1);
+    }
+
+    // 本来の軌道半径（法則を戻したときの基準）
+    ctx.strokeStyle = 'rgba(120,140,180,0.12)';
+    ctx.lineWidth = 1;
+    for (const p of ELEMENTS) {
+      ctx.beginPath();
+      ctx.arc(W/2, H/2, p.a * SCALE_BASE * law.zoom, 0, Math.PI*2);
+      ctx.stroke();
+    }
+
+    for (const b of bodies) {
+      if (b.trail.length > 1) {
+        ctx.strokeStyle = b.color + '70';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        for (let i = 0; i < b.trail.length; i++) {
+          const p = b.trail[i];
+          i ? ctx.lineTo(sx(p.x), sy(p.y)) : ctx.moveTo(sx(p.x), sy(p.y));
+        }
+        ctx.stroke();
+      }
+    }
+
+    for (const b of bodies) {
+      const X = sx(b.x), Y = sy(b.y);
+      if (b.id === 'sun') {
+        const g = ctx.createRadialGradient(X, Y, 0, X, Y, 46);
+        g.addColorStop(0, 'rgba(255,215,94,0.30)');
+        g.addColorStop(1, 'rgba(255,215,94,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(X, Y, 46, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.fillStyle = b.color;
+      ctx.beginPath(); ctx.arc(X, Y, b.r, 0, Math.PI*2); ctx.fill();
+    }
+  }
+
+  function drawGraph() {
+    gctx.clearRect(0, 0, GW, GH);
+    gctx.strokeStyle = 'rgba(120,140,180,0.16)';
+    gctx.lineWidth = 1;
+    gctx.beginPath(); gctx.moveTo(0, GH/2); gctx.lineTo(GW, GH/2); gctx.stroke();
+
+    if (hist.length < 2) return;
+    let lo = Infinity, hi = -Infinity;
+    for (const v of hist) { if (v < lo) lo = v; if (v > hi) hi = v; }
+    const span = Math.max(hi - lo, 1e-9);
+    const px = i => i / (hist.length - 1) * GW;
+    const py = v => GH - 6 - (v - lo) / span * (GH - 12);
+
+    for (const m of marks) {
+      if (m >= hist.length) continue;
+      gctx.strokeStyle = 'rgba(193,80,46,0.55)';
+      gctx.beginPath(); gctx.moveTo(px(m), 0); gctx.lineTo(px(m), GH); gctx.stroke();
+    }
+
+    gctx.strokeStyle = '#ffd75e';
+    gctx.lineWidth = 1.4;
+    gctx.beginPath();
+    hist.forEach((v, i) => i ? gctx.lineTo(px(i), py(v)) : gctx.moveTo(px(i), py(v)));
+    gctx.stroke();
+  }
+
+  // ===== ループ =====
+  const STEPS_PER_FRAME = 20;
+  const elYears = document.getElementById('years');
+  const elDE = document.getElementById('dE');
+  const elFps = document.getElementById('fps');
+  let last = performance.now(), fps = 60;
+
+  function loop(now) {
+    fps += ((1000 / Math.max(now - last, 1)) - fps) * 0.08;
+    last = now;
+
+    if (running && !broken) {
+      for (let k = 0; k < STEPS_PER_FRAME; k++) { stepOnce(bodies, law); years += DT; }
+
+      for (const b of bodies) {
+        if (!Number.isFinite(b.x) || !Number.isFinite(b.y)) { broken = true; running = false; }
+      }
+
+      for (const b of bodies) {
+        if (b.fixed) continue;
+        b.trail.push({ x: b.x, y: b.y });
+        if (b.trail.length > 1500) b.trail.shift();
+      }
+
+      const E = totalEnergy(bodies, law);
+      if (E !== null) {
+        if (E0 === null) E0 = E;
+        hist.push((E - E0) / Math.abs(E0) * 100);
+        if (hist.length > 600) { hist.shift(); marks = marks.map(m => m - 1).filter(m => m >= 0); }
+      }
+
+      elYears.innerHTML = years.toFixed(2) + '<small>yr</small>';
+      if (E === null) {
+        elDE.innerHTML = '<span class="broken">定義なし</span>';
+      } else {
+        const d = hist.length ? hist[hist.length - 1] : 0;
+        const cls = Math.abs(d) > 0.01 ? ' class="broken"' : '';
+        elDE.innerHTML = `<span${cls}>${d >= 0 ? '+' : ''}${d.toFixed(3)}</span><small>%</small>`;
+      }
+      elFps.textContent = Math.round(fps);
+
+      for (const b of bodies) {
+        if (b.fixed) continue;
+        const r = Math.sqrt(b.x*b.x + b.y*b.y);
+        legendVals[b.id].textContent = r.toFixed(3) + ' AU';
+      }
+    }
+
+    drawSky();
+    drawGraph();
+    requestAnimationFrame(loop);
+  }
+
+  fit();
+  syncAll();
+  requestAnimationFrame(loop);
+})();
+</script>
+
+</body>
+</html>
