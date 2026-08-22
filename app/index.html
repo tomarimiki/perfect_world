@@ -9,6 +9,24 @@
   <div id="hud">経過年数: <span id="year">0.00</span> 年</div>
   <button id="reset">リセット</button>
   <canvas id="canvas" width="600" height="600"></canvas>
+  <!-- ↓ ここから新規追加：Day3で導入したコントロールパネル -->
+  <div id="panel">
+    <div class="control">
+      <!-- スライダーの現在値をリアルタイムで表示する場所。
+           main.jsのdimSlider.addEventListener('input', ...)が
+           ここのtextContentを毎回書き換える -->
+      <label>空間の次元 <span id="dim-val">3.00</span></label>
+
+      <!-- id="dim" が main.js の document.getElementById('dim') で拾われる。
+           min/max/step は design.md 7章の法則テーブルの値をそのまま使用
+           （2.5〜4.0の範囲、0.01刻み） -->
+      <input type="range" id="dim" min="2.5" max="4.0" step="0.01" value="3.0">
+
+      <!-- スライダーの物理的背景を1行で説明（decisions.md A-11：説明文は最小限でよい） -->
+      <p class="note">3を超えると安定な軌道が存在しなくなる</p>
+    </div>
+  </div>
+  <!-- ↑ ここまで新規追加 -->
   <script type="module" src="main.js"></script>
 </body>
 </html>

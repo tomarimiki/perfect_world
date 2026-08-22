@@ -16,7 +16,7 @@
 
   <script type="module">
     import { createBodies, G } from './data.js';
-    import { step, dt } from './physics.js';
+    import { step, dt, defaultLaw } from './physics.js';
 
     const results = [];
 
@@ -33,6 +33,7 @@
     // テスト1: 周期 — 地球が1年でちょうど1周するか（design.md 5-3, 11章テスト1）
     function test1Period() {
       const bodies = createBodies();
+      const law = { ...defaultLaw };
       const earth = bodies.find(b => b.name === '地球');
       let prevAngle = Math.atan2(earth.y, earth.x);
       let unwrapped = 0;
@@ -40,7 +41,7 @@
       const maxYears = 2; // 1周しないままここまで来たら異常とみなす安全装置
 
       while (t < maxYears) {
-        step(bodies);
+        step(bodies, law);
         t += dt;
         const angle = Math.atan2(earth.y, earth.x);
         let delta = angle - prevAngle;
@@ -73,9 +74,10 @@
     // テスト2: エネルギー保存 — 100年回して変化率0.001%以下か（11章テスト2）
     function test2EnergyConservation() {
       const bodies = createBodies();
+      const law = { ...defaultLaw };
       const e0 = totalEnergy(bodies);
       const steps = Math.round(100 / dt);
-      for (let k = 0; k < steps; k++) step(bodies);
+      for (let k = 0; k < steps; k++) step(bodies, law);
       const e1 = totalEnergy(bodies);
       const relChangePercent = Math.abs((e1 - e0) / e0) * 100;
       assertClose('テスト2: 100年後のエネルギー変化率', relChangePercent, 0, 0.001, '%');
@@ -85,12 +87,13 @@
     // dtの符号を変える代わりに速度反転を使う（同じ意味：反転後に前進させると時間を逆行させたのと等価）。
     function test3TimeReversal() {
       const bodies = createBodies();
+      const law = { ...defaultLaw };
       const initial = bodies.map(b => ({ x: b.x, y: b.y }));
       const steps = Math.round(100 / dt);
 
-      for (let k = 0; k < steps; k++) step(bodies);
+      for (let k = 0; k < steps; k++) step(bodies, law);
       for (const b of bodies) { b.vx *= -1; b.vy *= -1; }
-      for (let k = 0; k < steps; k++) step(bodies);
+      for (let k = 0; k < steps; k++) step(bodies, law);
 
       let maxError = 0;
       bodies.forEach((b, i) => {

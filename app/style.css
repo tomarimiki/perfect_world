@@ -23,3 +23,43 @@ html, body {
   top: 8px;
   right: 8px;
 }
+
+/* コントロールパネルの外枠。
+   decisions.md A-9の決定（右側固定・幅320px・縦スクロール可）をそのまま反映 */
+#panel {
+  position: fixed;  /* スクロールしても画面に張り付いたまま */
+  top: 0;
+  right: 0;          /* 画面右端にぴったり寄せる */
+  width: 320px;       /* A-9で決めた固定幅 */
+  height: 100vh;      /* 画面の縦幅いっぱい */
+  overflow-y: auto;   /* スライダーが増えて縦に収まらなくなったらスクロールできるように */
+  box-sizing: border-box; /* paddingを含めてwidth:320pxに収まるようにする */
+  padding: 48px 16px 16px; /* 上だけ48px空けているのは、右上固定の「リセット」ボタン(#reset)と
+                              パネル内1つ目のスライダーが重ならないようにするため */
+  background: rgba(255, 255, 255, 0.03); /* ごく薄い白でパネル領域を可視化しつつ、
+                                             背後のcanvas(軌道)が透けて見えるようにする */
+}
+
+/* スライダー1つぶんのまとまり（ラベル＋つまみ＋説明文）の単位。
+   design.md 9-2の<div class="control">にそのまま対応。
+   将来Day4以降でG・gr・gwなど他のスライダーを増やすときも
+   このクラスを使い回す想定 */
+.control {
+  margin-bottom: 16px; /* スライダー同士の間隔 */
+}
+
+.control label {
+  display: block;      /* ラベルとスライダーを縦に並べる */
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.control input[type="range"] {
+  width: 100%;          /* パネル幅いっぱいまでスライダーを伸ばす */
+}
+
+.control .note {
+  margin: 4px 0 0;
+  font-size: 11px;       /* 補足説明は本文より小さく（decisions.md A-11「説明文は最小限」の空気に合わせて控えめに） */
+  color: #888;           /* 主張しすぎない薄いグレー */
+}
