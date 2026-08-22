@@ -4,9 +4,11 @@ export const G = 4 * Math.PI * Math.PI;   // 39.478
 export const C_LIGHT = 63241.077;          // 光速 [AU/年]（Day1では未使用。相対論補正用に後で使う）
 
 // a: 軌道長半径[AU], e: 離心率, m: 質量[太陽質量]
-// Day1は地球だけ。水星・金星・火星はDay2で追加する。
 const ELEMENTS = [
+  { name: '水星', a: 0.38710, e: 0.20563, m: 1.6601e-7, color: '#a89078', r: 3 },
+  { name: '金星', a: 0.72333, e: 0.00677, m: 2.4478e-6, color: '#e8c07a', r: 5 },
   { name: '地球', a: 1.00000, e: 0.01671, m: 3.0035e-6, color: '#5b9bd5', r: 5 },
+  { name: '火星', a: 1.52368, e: 0.09340, m: 3.2271e-7, color: '#c1502e', r: 4 },
 ];
 
 export function createBodies() {

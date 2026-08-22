@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>物理エンジン検算 - test.html</title>
+  <style>
+    body { background: #000008; color: #ccc; font-family: monospace; padding: 16px; }
+    .pass { color: #6fdc6f; }
+    .fail { color: #ff6b6b; }
+  </style>
+</head>
+<body>
+  <h1>物理エンジン検算（design.md 11章 / decisions.md C-4）</h1>
+  <p>テスト4（相対論の検算）はGR未実装（Day5予定）のため対象外。</p>
+  <div id="results">計算中...</div>
+
+  <script type="module">
+    import { createBodies, G } from './data.js';
+    import { step, dt } from './physics.js';
+
+    const results = [];
+
+    function assertClose(name, actual, expected, tolerance, unit = '') {
+      const diff = Math.abs(actual - expected);
+      const pass = diff <= tolerance;
+      results.push({
+        name,
+        pass,
+        detail: `実測値=${actual.toFixed(6)}${unit} 期待値=${expected}${unit} 誤差=${diff.toFixed(6)}${unit}（許容${tolerance}${unit}）`
+      });
+    }
+
+    // テスト1: 周期 — 地球が1年でちょうど1周するか（design.md 5-3, 11章テスト1）
+    function test1Period() {
+      const bodies = createBodies();
+      const earth = bodies.find(b => b.name === '地球');
+      let prevAngle = Math.atan2(earth.y, earth.x);
+      let unwrapped = 0;
+      let t = 0;
+      const maxYears = 2; // 1周しないままここまで来たら異常とみなす安全装置
+
+      while (t < maxYears) {
+        step(bodies);
+        t += dt;
+        const angle = Math.atan2(earth.y, earth.x);
+        let delta = angle - prevAngle;
+        if (delta > Math.PI) delta -= 2 * Math.PI;
+        if (delta < -Math.PI) delta += 2 * Math.PI;
+        unwrapped += delta;
+        prevAngle = angle;
+        if (Math.abs(unwrapped) >= 2 * Math.PI) break;
+      }
+      assertClose('テスト1: 地球の公転周期', t, 1.00, 0.01, '年');
+    }
+
+    // 全天体の力学的エネルギー（運動+ポテンシャル）。指数2固定の現在の重力式に対応する式（B-4参照）。
+    function totalEnergy(bodies) {
+      let ke = 0, pe = 0;
+      for (const b of bodies) {
+        ke += 0.5 * b.m * (b.vx * b.vx + b.vy * b.vy);
+      }
+      for (let i = 0; i < bodies.length; i++) {
+        for (let j = i + 1; j < bodies.length; j++) {
+          const dx = bodies[j].x - bodies[i].x;
+          const dy = bodies[j].y - bodies[i].y;
+          const r = Math.sqrt(dx * dx + dy * dy) + 1e-9;
+          pe += -G * bodies[i].m * bodies[j].m / r;
+        }
+      }
+      return ke + pe;
+    }
+
+    // テスト2: エネルギー保存 — 100年回して変化率0.001%以下か（11章テスト2）
+    function test2EnergyConservation() {
+      const bodies = createBodies();
+      const e0 = totalEnergy(bodies);
+      const steps = Math.round(100 / dt);
+      for (let k = 0; k < steps; k++) step(bodies);
+      const e1 = totalEnergy(bodies);
+      const relChangePercent = Math.abs((e1 - e0) / e0) * 100;
+      assertClose('テスト2: 100年後のエネルギー変化率', relChangePercent, 0, 0.001, '%');
+    }
+
+    // テスト3: 時間反転 — 100年進めて全速度を反転し、また100年進めると元の配置に戻るか（11章テスト3）
+    // dtの符号を変える代わりに速度反転を使う（同じ意味：反転後に前進させると時間を逆行させたのと等価）。
+    function test3TimeReversal() {
+      const bodies = createBodies();
+      const initial = bodies.map(b => ({ x: b.x, y: b.y }));
+      const steps = Math.round(100 / dt);
+
+      for (let k = 0; k < steps; k++) step(bodies);
+      for (const b of bodies) { b.vx *= -1; b.vy *= -1; }
+      for (let k = 0; k < steps; k++) step(bodies);
+
+      let maxError = 0;
+      bodies.forEach((b, i) => {
+        const dx = b.x - initial[i].x;
+        const dy = b.y - initial[i].y;
+        maxError = Math.max(maxError, Math.sqrt(dx * dx + dy * dy));
+      });
+      assertClose('テスト3: 時間反転後の位置誤差（全天体中の最大）', maxError, 0, 1e-4, ' AU');
+    }
+
+    test1Period();
+    test2EnergyConservation();
+    test3TimeReversal();
+
+    const container = document.getElementById('results');
+    container.innerHTML = '';
+    for (const r of results) {
+      const line = document.createElement('div');
+      line.className = r.pass ? 'pass' : 'fail';
+      line.textContent = `[${r.pass ? 'PASS' : 'FAIL'}] ${r.name} — ${r.detail}`;
+      container.appendChild(line);
+    }
+  </script>
+</body>
+</html>
