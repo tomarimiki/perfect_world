@@ -2,12 +2,16 @@ import { G } from './data.js';
 
 // 時間刻み[年]。水星の公転周期(0.24年)に対して1/2000なら1周あたり約480ステップになり、
 // 後日GR補正を入れたときにも精度が足りる（design.md 6-3）。
+// decisions.md A-4の決定により、dtの大きさ自体は固定。符号だけをlaw.dtSignで反転する。
 export const dt = 1 / 2000; // 時間刻み [年]（約4.4時間）
 
 // 「壊しどころ」をまとめたオブジェクト（design.md 6-3）。
-// Day3では dimension だけを使う。G・gr・gw・lambda・yukawa・sunMass・dt は後日のDayで追加する。
+// Day4で G・sunMass・dtSign を追加。gr・gw・lambda・yukawa は後日のDayで追加する。
 export const defaultLaw = {
   dimension: 3.0, // 空間の次元。力の指数 = dimension - 1（3次元なら2乗で現実の重力）
+  G: G,           // 重力定数。data.jsのGとは別物（decisions.md B-2）。初期速度の計算には使わない
+  sunMass: 1.0,   // 太陽質量の倍率。相手が太陽(j===0)のときだけ掛かる
+  dtSign: 1,      // 時間の流れの符号。-1にすると時間が逆行する（decisions.md A-4）
 };
 
 /**
@@ -30,8 +34,12 @@ export function computeAccel(bodies, law) {
       const dy = B.y - A.y;
       const r  = Math.sqrt(dx * dx + dy * dy) + 1e-9;  // 0除算よけ（天体が重なるとr=0になりうる）
 
+      // 相手が太陽(j===0)のときだけ質量倍率law.sunMassを掛ける（design.md 6-4）
+      const mB = (j === 0) ? B.m * law.sunMass : B.m;
+
       // ニュートンの万有引力の一般化: a = G*m / r^(dimension-1)（Bがつくる重力加速度）
-      const a = G * B.m / Math.pow(r, exponent);
+      // law.G はスライダーで変更可能。data.jsのG（初期速度計算用）とは独立している（decisions.md B-2）
+      const a = law.G * mB / Math.pow(r, exponent);
 
       // 加速度ベクトルはAからBへ向く単位ベクトル(dx/r, dy/r)にaを掛けたもの
       acc[i].ax += a * dx / r;
@@ -51,24 +59,28 @@ export function computeAccel(bodies, law) {
  *
  * decisions.md B-3の決定により、太陽(bodies[0])は完全に固定する。
  * 太陽が及ぼす力は他の天体に働くが、太陽自身の速度・位置は更新しない（i=1から始める）。
+ *
+ * law.dtSignが-1のとき、dtの符号が反転し時間が逆行する（decisions.md A-4）。
+ * Leapfrogは時間反転対称なので、符号を反転するだけで正確に逆再生できる。
  */
 export function step(bodies, law) {
+  const signedDt = dt * law.dtSign;
   let acc = computeAccel(bodies, law);
 
   // 1. 速度を半歩進める（kick）
   for (let i = 1; i < bodies.length; i++) {
-    bodies[i].vx += acc[i].ax * dt / 2;
-    bodies[i].vy += acc[i].ay * dt / 2;
+    bodies[i].vx += acc[i].ax * signedDt / 2;
+    bodies[i].vy += acc[i].ay * signedDt / 2;
   }
   // 2. 位置を1歩進める（drift）— このときの速度は半歩分の速度
   for (let i = 1; i < bodies.length; i++) {
-    bodies[i].x += bodies[i].vx * dt;
-    bodies[i].y += bodies[i].vy * dt;
+    bodies[i].x += bodies[i].vx * signedDt;
+    bodies[i].y += bodies[i].vy * signedDt;
   }
   // 3. 新しい位置で加速度を計算し直し、速度の残り半歩を進める（kick）
   acc = computeAccel(bodies, law);
   for (let i = 1; i < bodies.length; i++) {
-    bodies[i].vx += acc[i].ax * dt / 2;
-    bodies[i].vy += acc[i].ay * dt / 2;
+    bodies[i].vx += acc[i].ax * signedDt / 2;
+    bodies[i].vy += acc[i].ay * signedDt / 2;
   }
 }

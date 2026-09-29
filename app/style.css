@@ -22,6 +22,11 @@ html, body {
   position: fixed;
   top: 8px;
   right: 8px;
+  /* #panelは同じ右上領域(top:0〜100vh, right:0〜320px)を占めており、
+     HTML上で#resetより後ろに書かれているため、z-index指定なしだと#panelが手前に来て
+     クリックを奪ってしまう（見た目には#panelは半透明なので気づきにくい）。
+     z-indexで常にこのボタンを手前に固定する。 */
+  z-index: 10;
 }
 
 /* コントロールパネルの外枠。

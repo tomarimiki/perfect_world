@@ -104,9 +104,31 @@
       assertClose('テスト3: 時間反転後の位置誤差（全天体中の最大）', maxError, 0, 1e-4, ' AU');
     }
 
+    // 追加テスト(Day4): law.dtSign=-1にした場合の時間反転（decisions.md A-4の実装そのものの検算）
+    // テスト3は速度反転で代用していたが、こちらはDay4で実際にUIから触れるdtSignの経路を通す。
+    function test4DtSignReversal() {
+      const bodies = createBodies();
+      const law = { ...defaultLaw };
+      const initial = bodies.map(b => ({ x: b.x, y: b.y }));
+      const steps = Math.round(50 / dt);
+
+      for (let k = 0; k < steps; k++) step(bodies, law);
+      law.dtSign = -1;
+      for (let k = 0; k < steps; k++) step(bodies, law);
+
+      let maxError = 0;
+      bodies.forEach((b, i) => {
+        const dx = b.x - initial[i].x;
+        const dy = b.y - initial[i].y;
+        maxError = Math.max(maxError, Math.sqrt(dx * dx + dy * dy));
+      });
+      assertClose('追加テスト(Day4): dtSign=-1での時間反転位置誤差（全天体中の最大）', maxError, 0, 1e-4, ' AU');
+    }
+
     test1Period();
     test2EnergyConservation();
     test3TimeReversal();
+    test4DtSignReversal();
 
     const container = document.getElementById('results');
     container.innerHTML = '';
