@@ -11,7 +11,6 @@
 </head>
 <body>
   <h1>物理エンジン検算（design.md 11章 / decisions.md C-4）</h1>
-  <p>テスト4（相対論の検算）はGR未実装（Day5予定）のため対象外。</p>
   <div id="results">計算中...</div>
 
   <script type="module">
@@ -104,6 +103,35 @@
       assertClose('テスト3: 時間反転後の位置誤差（全天体中の最大）', maxError, 0, 1e-4, ' AU');
     }
 
+    // テスト4: 相対論 — gr=1で水星を100年回し、近日点が42.98秒角ずれるか（11章テスト4 / decisions.md B-6）
+    // 他の惑星の摂動（100年で約530秒角）が混ざらないよう、太陽と水星だけで回す。
+    // また時間刻みの粗さによる見かけの近日点移動（gr=0でも数千秒角ある）を打ち消すため、
+    // gr=1 と gr=0 の差を相対論の効果とみなす。
+    function test4GrPerihelion() {
+      // 近日点の向き = 離心率ベクトル e = (v×h)/GM - r/|r| の角度。
+      // 「最接近の瞬間」を探すより、毎ステップの位置と速度から直接求めるほうが時間刻みに左右されない。
+      function perihelionAngle(b) {
+        const r = Math.sqrt(b.x * b.x + b.y * b.y);
+        const h = b.x * b.vy - b.y * b.vx; // 比角運動量
+        const ex = b.vy * h / G - b.x / r;
+        const ey = -b.vx * h / G - b.y / r;
+        return Math.atan2(ey, ex);
+      }
+      function shiftAfter100Years(gr) {
+        const bodies = createBodies().filter(b => b.name === '太陽' || b.name === '水星');
+        const law = { ...defaultLaw, gr };
+        const mercury = bodies[1];
+        const start = perihelionAngle(mercury);
+        const steps = Math.round(100 / dt);
+        for (let k = 0; k < steps; k++) step(bodies, law);
+        const d = perihelionAngle(mercury) - start;
+        return Math.atan2(Math.sin(d), Math.cos(d)); // -π〜πに正規化
+      }
+      const toArcsec = rad => rad * 180 / Math.PI * 3600;
+      const shift = toArcsec(shiftAfter100Years(1) - shiftAfter100Years(0));
+      assertClose('テスト4: 水星の近日点移動（100年、gr=1とgr=0の差）', shift, 42.98, 1, '秒角');
+    }
+
     // 追加テスト(Day4): law.dtSign=-1にした場合の時間反転（decisions.md A-4の実装そのものの検算）
     // テスト3は速度反転で代用していたが、こちらはDay4で実際にUIから触れるdtSignの経路を通す。
     function test4DtSignReversal() {
@@ -128,6 +156,7 @@
     test1Period();
     test2EnergyConservation();
     test3TimeReversal();
+    test4GrPerihelion();
     test4DtSignReversal();
 
     const container = document.getElementById('results');

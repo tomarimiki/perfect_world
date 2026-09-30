@@ -11,6 +11,14 @@ let bodies = createBodies();
 let simYears = 0; // シミュレーション上の経過年数（現実の経過時間とは別）
 let law = { ...defaultLaw }; // 法則パラメータ。リセットしても戻さない（decisions.md A-5）
 
+// デバッグ用：URLパラメータでlawの値を直接指定する（decisions.md B-6）。
+// 例: ?gr=1 とすると design.md 11章テスト4（水星の近日点移動42.98秒角）の検算ができる。
+// スライダーの刻み幅では gr=1 を正確に入力できないための抜け道で、UIには出さない。
+const debugParams = new URLSearchParams(location.search);
+for (const key of ['gr', 'gw']) {
+  if (debugParams.has(key)) law[key] = parseFloat(debugParams.get(key));
+}
+
 // 1フレームあたり何ステップ計算するか（描画60fpsに対し物理は細かく回す）
 // dt=1/2000年、STEPS_PER_FRAME=20 → 60fpsなら実時間1秒でシミュレーション0.6年進む。
 // decisions.md A-4の決定により「時間の流れ」スライダーの実体はこの値。
@@ -77,4 +85,20 @@ timeSlider.addEventListener('input', () => {
   law.dtSign = v < 0 ? -1 : 1;
   stepsPerFrame = Math.max(1, Math.abs(v)); // 0のときも1歩は進める
   timeVal.textContent = v.toFixed(0);
+});
+
+// 相対論スライダー。太陽との相互作用にのみ近日点移動を発生させる（decisions.md B-5）
+const grSlider = document.getElementById('gr');
+const grVal = document.getElementById('gr-val');
+grSlider.addEventListener('input', () => {
+  law.gr = parseFloat(grSlider.value);
+  grVal.textContent = law.gr.toFixed(0);
+});
+
+// 重力波スライダー。速度に比例する減衰で螺旋落下を起こす（design.md 7章）
+const gwSlider = document.getElementById('gw');
+const gwVal = document.getElementById('gw-val');
+gwSlider.addEventListener('input', () => {
+  law.gw = parseFloat(gwSlider.value);
+  gwVal.textContent = law.gw.toFixed(2);
 });

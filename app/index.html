@@ -47,6 +47,21 @@
       <p class="note">負にすると時間が逆行する</p>
     </div>
     <!-- ↑ Day4ここまで -->
+
+    <!-- ↓ Day5で追加：相対論と重力波。decisions.md A-9により同じ#panel内に置く -->
+    <div class="control">
+      <!-- min/max/defaultはdesign.md 7章の法則テーブルの値。gr=1が現実相当（100年で43秒角） -->
+      <label>相対論 <span id="gr-val">0</span></label>
+      <input type="range" id="gr" min="0" max="100000" step="100" value="0">
+      <p class="note">近日点がずれ続け、花びら状のロゼッタ軌道になる</p>
+    </div>
+
+    <div class="control">
+      <label>重力波 <span id="gw-val">0.00</span></label>
+      <input type="range" id="gw" min="0" max="2" step="0.01" value="0">
+      <p class="note">螺旋を描きながら太陽へ落下する</p>
+    </div>
+    <!-- ↑ Day5ここまで -->
   </div>
   <!-- ↑ ここまで新規追加 -->
   <script type="module" src="main.js"></script>

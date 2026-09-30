@@ -1,4 +1,4 @@
-import { G } from './data.js';
+import { G, C_LIGHT } from './data.js';
 
 // 時間刻み[年]。水星の公転周期(0.24年)に対して1/2000なら1周あたり約480ステップになり、
 // 後日GR補正を入れたときにも精度が足りる（design.md 6-3）。
@@ -6,12 +6,14 @@ import { G } from './data.js';
 export const dt = 1 / 2000; // 時間刻み [年]（約4.4時間）
 
 // 「壊しどころ」をまとめたオブジェクト（design.md 6-3）。
-// Day4で G・sunMass・dtSign を追加。gr・gw・lambda・yukawa は後日のDayで追加する。
+// Day5で gr・gw を追加。lambda・yukawa は後日のDayで追加する。
 export const defaultLaw = {
   dimension: 3.0, // 空間の次元。力の指数 = dimension - 1（3次元なら2乗で現実の重力）
   G: G,           // 重力定数。data.jsのGとは別物（decisions.md B-2）。初期速度の計算には使わない
   sunMass: 1.0,   // 太陽質量の倍率。相手が太陽(j===0)のときだけ掛かる
   dtSign: 1,      // 時間の流れの符号。-1にすると時間が逆行する（decisions.md A-4）
+  gr: 0,          // 相対論補正の増幅率（0 = オフ）。太陽との相互作用にのみ適用（decisions.md B-5）
+  gw: 0,          // 重力波減衰の強さ（0 = オフ）。design.md 7章
 };
 
 /**
@@ -39,11 +41,27 @@ export function computeAccel(bodies, law) {
 
       // ニュートンの万有引力の一般化: a = G*m / r^(dimension-1)（Bがつくる重力加速度）
       // law.G はスライダーで変更可能。data.jsのG（初期速度計算用）とは独立している（decisions.md B-2）
-      const a = law.G * mB / Math.pow(r, exponent);
+      let a = law.G * mB / Math.pow(r, exponent);
+
+      // --- 一般相対論補正：近日点移動を生む（design.md 7章） ---
+      // decisions.md B-5の決定により、相手が太陽(j===0)のときだけ適用する。
+      // hはAの太陽まわりの比角運動量なので、相手が惑星のときは物理的な意味を持たない。
+      if (law.gr > 0 && j === 0) {
+        const h = A.x * A.vy - A.y * A.vx; // 比角運動量
+        const corr = 3 * h * h / (C_LIGHT * C_LIGHT * r * r);
+        a *= (1 + law.gr * corr);
+      }
 
       // 加速度ベクトルはAからBへ向く単位ベクトル(dx/r, dy/r)にaを掛けたもの
       acc[i].ax += a * dx / r;
       acc[i].ay += a * dy / r;
+    }
+
+    // --- 重力波：速度に比例する減衰。螺旋を描いて太陽へ落下する（design.md 7章） ---
+    // 太陽(i===0)は decisions.md B-3により固定なので対象外。
+    if (law.gw > 0 && i > 0) {
+      acc[i].ax -= law.gw * bodies[i].vx;
+      acc[i].ay -= law.gw * bodies[i].vy;
     }
   }
   return acc;
