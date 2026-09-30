@@ -1,8 +1,8 @@
 // data.js(初期状態) → physics.js(1歩進める) → render.js(描く) をつなぐだけの層。
 // このファイル以外はDOM(document/canvas)を直接触らない、という依存関係の向きを守っている。
 import { createBodies } from './data.js';
-import { step, dt, defaultLaw } from './physics.js';
-import { draw } from './render.js';
+import { step, dt, defaultLaw, totalEnergy } from './physics.js';
+import { draw, drawEnergyGraph } from './render.js';
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -10,6 +10,35 @@ const ctx = canvas.getContext('2d');
 let bodies = createBodies();
 let simYears = 0; // シミュレーション上の経過年数（現実の経過時間とは別）
 let law = { ...defaultLaw }; // 法則パラメータ。リセットしても戻さない（decisions.md A-5）
+
+// --- エネルギーグラフ（decisions.md A-7）。メインcanvasの残像処理と干渉しないよう別canvasに描く ---
+const energyCanvas = document.getElementById('energy-graph');
+const energyCtx = energyCanvas.getContext('2d');
+const ENERGY_CAPACITY = 600; // 1フレーム1点で直近10秒ぶん。超えたら先頭を捨てる
+let energyHistory = [];       // { value: 変化率 または null, marker: 法則を変えた瞬間か }
+let energy0 = totalEnergy(bodies, law); // 変化率の基準。dimension ≠ 3 で始まったときはnullで、最初に定義された値を使う
+let pendingMarker = false;    // スライダーが動いたら、次に記録する点に縦線マーカーを付ける（decisions.md A-6）
+
+// 直近1秒（60点）の動きから、グラフの状態を一言で表す。グラフだけでは何を見ればいいか分かりにくいため。
+// 「保存」の判定幅 1e-5（0.001%）は design.md 11章テスト2 の許容値。Leapfrogの正常なゆらぎはこの内側に収まる。
+const STATUS_WINDOW = 60;
+const CONSERVED_RANGE = 1e-5;
+function energyStatus(history) {
+  const recent = history.slice(-STATUS_WINDOW);
+  const last = recent[recent.length - 1];
+  if (!last || last.value === null) return { text: '定義されない（次元が3でない）', kind: 'undefined' };
+
+  const values = recent.filter(p => p.value !== null).map(p => p.value);
+  const range = Math.max(...values) - Math.min(...values);
+  if (range < CONSERVED_RANGE) return { text: '保存されている', kind: 'ok' };
+
+  // 窓の最初と最後の差が振れ幅の半分を超えていれば一方向の変化、そうでなければ上下に揺れているだけ。
+  // 揺れは相対論（速度に依存する力）のほか、Gや太陽質量を上げて水星が太陽に近づいたときの
+  // 積分誤差（dt固定のため。decisions.md A-4）でも出る。どちらも一方向には流れない
+  const net = values[values.length - 1] - values[0];
+  if (Math.abs(net) > range / 2) return { text: net < 0 ? '減っている' : '増えている', kind: 'broken' };
+  return { text: '揺れている（増減の傾向なし）', kind: 'broken' };
+}
 
 // デバッグ用：URLパラメータでlawの値を直接指定する（decisions.md B-6）。
 // 例: ?gr=1 とすると design.md 11章テスト4（水星の近日点移動42.98秒角）の検算ができる。
@@ -40,7 +69,20 @@ function loop() {
 
   draw(ctx, bodies, canvas);
 
+  // 全エネルギーを記録してグラフに描く。dimension ≠ 3 では定義されないのでnull（decisions.md B-4）
+  const energy = totalEnergy(bodies, law);
+  if (energy !== null && energy0 === null) energy0 = energy;
+  energyHistory.push({
+    value: energy === null ? null : (energy - energy0) / Math.abs(energy0),
+    marker: pendingMarker,
+  });
+  pendingMarker = false;
+  if (energyHistory.length > ENERGY_CAPACITY) energyHistory.shift();
+  drawEnergyGraph(energyCtx, energyCanvas, energyHistory, ENERGY_CAPACITY, energyStatus(energyHistory));
+
   document.getElementById('year').textContent = simYears.toFixed(2);
+  document.getElementById('energy').textContent =
+    energy === null ? '—（定義されません）' : energy.toExponential(6);
 
   requestAnimationFrame(loop); // 次のフレームでまたloopを呼んでもらう（無限ループ）
 }
@@ -50,7 +92,16 @@ loop();
 document.getElementById('reset').onclick = () => {
   bodies = createBodies();
   simYears = 0;
+  // エネルギーの履歴も全消去し、基準をリセット後の配置で取り直す（decisions.md A-7）
+  energyHistory = [];
+  energy0 = totalEnergy(bodies, law);
 };
+
+// どのスライダーを動かしても、エネルギーグラフに縦線マーカーを引く（decisions.md A-6）。
+// inputイベントは#panelまで伝わってくるので、ここで1回受ければ全スライダーをまとめて拾える。
+document.getElementById('panel').addEventListener('input', () => {
+  pendingMarker = true;
+});
 
 // 空間の次元スライダー: 動かした瞬間からlawに反映される（decisions.md A-6）
 const dimSlider = document.getElementById('dim');

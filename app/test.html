@@ -15,7 +15,7 @@
 
   <script type="module">
     import { createBodies, G } from './data.js';
-    import { step, dt, defaultLaw } from './physics.js';
+    import { step, dt, defaultLaw, totalEnergy as physicsTotalEnergy } from './physics.js';
 
     const results = [];
 
@@ -153,11 +153,49 @@
       assertClose('追加テスト(Day4): dtSign=-1での時間反転位置誤差（全天体中の最大）', maxError, 0, 1e-4, ' AU');
     }
 
+    // 追加テスト(Day6): physics.jsのtotalEnergy（エネルギーグラフの元データ）の検算
+    function test6Energy() {
+      // (a) 既定の法則では100年でほぼ保存する（テスト2と同じ条件をphysics.js側の関数で）
+      {
+        const bodies = createBodies();
+        const law = { ...defaultLaw };
+        const e0 = physicsTotalEnergy(bodies, law);
+        for (let k = 0; k < Math.round(100 / dt); k++) step(bodies, law);
+        const rel = Math.abs((physicsTotalEnergy(bodies, law) - e0) / e0) * 100;
+        assertClose('追加テスト(Day6): totalEnergyの100年保存（既定の法則）', rel, 0, 0.001, '%');
+      }
+      // (b) 太陽質量を1.5にしたまま回しても保存する（sunMassをポテンシャルに入れている検算）。
+      // 0.5だと地球の初速が脱出速度とほぼ等しく全エネルギーが≒0になり、変化率の分母が小さすぎて検算にならない
+      {
+        const bodies = createBodies();
+        const law = { ...defaultLaw, sunMass: 1.5 };
+        const e0 = physicsTotalEnergy(bodies, law);
+        for (let k = 0; k < Math.round(10 / dt); k++) step(bodies, law);
+        const rel = Math.abs((physicsTotalEnergy(bodies, law) - e0) / e0) * 100;
+        assertClose('追加テスト(Day6): 太陽質量1.5で10年回したときのエネルギー変化率', rel, 0, 0.001, '%');
+      }
+      // (c) 重力波をかけるとエネルギーが減る（グラフが下に折れることの検算）
+      {
+        const bodies = createBodies();
+        const law = { ...defaultLaw, gw: 0.5 };
+        const e0 = physicsTotalEnergy(bodies, law);
+        for (let k = 0; k < Math.round(1 / dt); k++) step(bodies, law);
+        const decreased = physicsTotalEnergy(bodies, law) < e0 ? 1 : 0;
+        assertClose('追加テスト(Day6): 重力波gw=0.5で1年後にエネルギーが減る（1=減った）', decreased, 1, 0);
+      }
+      // (d) dimension ≠ 3 では定義されない（decisions.md B-4）
+      {
+        const undefinedEnergy = physicsTotalEnergy(createBodies(), { ...defaultLaw, dimension: 3.4 }) === null ? 1 : 0;
+        assertClose('追加テスト(Day6): dimension=3.4でtotalEnergyがnull（1=null）', undefinedEnergy, 1, 0);
+      }
+    }
+
     test1Period();
     test2EnergyConservation();
     test3TimeReversal();
     test4GrPerihelion();
     test4DtSignReversal();
+    test6Energy();
 
     const container = document.getElementById('results');
     container.innerHTML = '';

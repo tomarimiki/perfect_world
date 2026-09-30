@@ -68,3 +68,11 @@ html, body {
   font-size: 11px;       /* 補足説明は本文より小さく（decisions.md A-11「説明文は最小限」の空気に合わせて控えめに） */
   color: #888;           /* 主張しすぎない薄いグレー */
 }
+
+/* Day6で追加：エネルギーグラフ。design.md 1章「画面下部には全エネルギーのグラフ」に合わせて左下に固定する */
+#energy-graph {
+  position: fixed;
+  left: 8px;
+  bottom: 8px;
+  border: 1px solid #222;
+}

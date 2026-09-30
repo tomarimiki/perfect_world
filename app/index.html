@@ -6,9 +6,14 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="hud">経過年数: <span id="year">0.00</span> 年</div>
+  <div id="hud">
+    経過年数: <span id="year">0.00</span> 年<br>
+    全エネルギー: <span id="energy">—</span>
+  </div>
   <button id="reset">リセット</button>
   <canvas id="canvas" width="600" height="600"></canvas>
+  <!-- Day6で追加：エネルギーグラフ。メインcanvasの残像処理と干渉しないよう別canvasにする（decisions.md A-7） -->
+  <canvas id="energy-graph" width="600" height="140"></canvas>
   <!-- ↓ ここから新規追加：Day3で導入したコントロールパネル -->
   <div id="panel">
     <div class="control">

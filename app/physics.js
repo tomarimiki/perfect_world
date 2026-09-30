@@ -102,3 +102,31 @@ export function step(bodies, law) {
     bodies[i].vy += acc[i].ay * signedDt / 2;
   }
 }
+
+/**
+ * 全エネルギー（運動エネルギー＋ポテンシャル）。法則を壊すとこれが保存しなくなる（design.md 6章）。
+ *
+ * ポテンシャル -G·m1·m2/r は3次元（逆二乗）専用の式なので、
+ * decisions.md B-4の決定により dimension ≠ 3 のときは「定義されない」として null を返す。
+ *
+ * 力の式（computeAccel）と対応させるため、law.G と law.sunMass（太陽との組だけ）を使う。
+ * こうしておくと、G や太陽質量を変えた状態でも「値を変えた瞬間に段差が出て、その後は保存する」になり、
+ * 保存しなくなるのは相対論・重力波のように本当にエネルギーを出し入れする法則だけになる。
+ * 太陽は固定（decisions.md B-3）なので運動エネルギーは常に0。
+ */
+export function totalEnergy(bodies, law) {
+  if (law.dimension !== 3) return null;
+
+  let kinetic = 0, potential = 0;
+  for (let i = 0; i < bodies.length; i++) {
+    const b = bodies[i];
+    kinetic += 0.5 * b.m * (b.vx * b.vx + b.vy * b.vy);
+    for (let j = i + 1; j < bodies.length; j++) {
+      const dx = bodies[j].x - b.x, dy = bodies[j].y - b.y;
+      const r = Math.sqrt(dx * dx + dy * dy) + 1e-9;
+      const mi = (i === 0) ? b.m * law.sunMass : b.m; // i<jなので太陽になりうるのはiだけ
+      potential -= law.G * mi * bodies[j].m / r;
+    }
+  }
+  return kinetic + potential;
+}
