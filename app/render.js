@@ -1,20 +1,30 @@
 // 距離は実スケールで描き、天体の半径だけ誇張する（design.md 8-1）。
 // 実スケールのまま半径も描くと太陽が1px未満になって見えないため。
-const SCALE = 220; // 1 AU = 220 px
+// 縮尺（1 AUあたりのpx）は固定値ではなく、画面の大きさから fitScale() で決める（decisions.md A-9）。
+// 画面の短辺の半分に収めたい距離[AU]。火星の遠日点 1.524×(1+0.093) ≈ 1.67 AU に、
+// 天体の円の半径と軌跡のぶれの余白を足した値。以前の固定値 SCALE=220・600px四方では約1.36 AUまでしか映らず、
+// 火星の軌道がはみ出していた。
+const FIT_RADIUS_AU = 1.75;
+
+// 描画領域の幅・高さ[px]から縮尺を決める。
+export function fitScale(width, height) {
+  return Math.min(width, height) / 2 / FIT_RADIUS_AU;
+}
 
 // シミュレーション座標(AU、数学的にy軸は上向き)を画面座標(px、y軸は下向き)に変換する。
-function toScreen(x, y, canvas) {
+// view: { width, height, scale } 描画領域の大きさ（CSSピクセル）と縮尺
+function toScreen(x, y, view) {
   return {
-    sx: canvas.width  / 2 + x * SCALE,
-    sy: canvas.height / 2 - y * SCALE // 上下反転（数学のy軸は上向き）
+    sx: view.width  / 2 + x * view.scale,
+    sy: view.height / 2 - y * view.scale // 上下反転（数学のy軸は上向き）
   };
 }
 
-export function draw(ctx, bodies, canvas) {
+export function draw(ctx, bodies, view) {
   // 完全な黒(fillRect)ではなく半透明の黒で塗りつぶすことで、前フレームの絵がうっすら残る。
   // これが「軌跡」の正体（trail配列を線で結ぶのと合わせて二重に効いている）。
   ctx.fillStyle = 'rgba(0, 0, 8, 0.25)';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, view.width, view.height);
 
   for (const b of bodies) {
     // 軌跡: 天体ごとに保存してきた座標履歴(trail)を線でつなぐ
@@ -22,13 +32,13 @@ export function draw(ctx, bodies, canvas) {
     ctx.lineWidth = 1;
     ctx.beginPath();
     b.trail.forEach((p, i) => {
-      const { sx, sy } = toScreen(p.x, p.y, canvas);
+      const { sx, sy } = toScreen(p.x, p.y, view);
       i === 0 ? ctx.moveTo(sx, sy) : ctx.lineTo(sx, sy);
     });
     ctx.stroke();
 
     // 本体: 現在位置に円を描く
-    const { sx, sy } = toScreen(b.x, b.y, canvas);
+    const { sx, sy } = toScreen(b.x, b.y, view);
     ctx.fillStyle = b.color;
     ctx.beginPath();
     ctx.arc(sx, sy, b.r, 0, Math.PI * 2);
@@ -57,9 +67,10 @@ const STATUS_COLORS = { ok: '#6fdc6f', broken: '#ffa94d', undefined: '#888' };
  * capacity: 保持する最大点数。横軸はこの点数ぶんで固定し、左から右へ伸びていく。
  * status: { text, kind } グラフの状態を一言で表したもの（main.jsで判定）。タイトルの横に出す。
  * メインcanvasとは別のcanvasに描くので、残像処理はせず毎フレーム全消去する。
+ * size: { width, height } グラフの大きさ（CSSピクセル。高解像度対応でcanvas.widthとは一致しない）
  */
-export function drawEnergyGraph(ctx, canvas, history, capacity, status) {
-  const w = canvas.width, h = canvas.height;
+export function drawEnergyGraph(ctx, size, history, capacity, status) {
+  const w = size.width, h = size.height;
   const padTop = 24;    // 上の余白（タイトルと状態を置く）
   const padBottom = 14; // 下の余白（目盛りの文字を置く）
   ctx.fillStyle = '#05050f';

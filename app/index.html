@@ -11,11 +11,19 @@
     全エネルギー: <span id="energy">—</span>
   </div>
   <button id="reset">リセット</button>
+  <!-- Day7で追加：一時停止（decisions.md A-5。スペースキーでも切り替わる） -->
+  <button id="pause">一時停止</button>
   <canvas id="canvas" width="600" height="600"></canvas>
   <!-- Day6で追加：エネルギーグラフ。メインcanvasの残像処理と干渉しないよう別canvasにする（decisions.md A-7） -->
   <canvas id="energy-graph" width="600" height="140"></canvas>
   <!-- ↓ ここから新規追加：Day3で導入したコントロールパネル -->
   <div id="panel">
+    <!-- Day7で追加：プリセットボタン（design.md 9-3）。ボタンはmain.jsのPRESETSから生成する -->
+    <div class="control">
+      <label>プリセット</label>
+      <div id="presets"></div>
+    </div>
+
     <div class="control">
       <!-- スライダーの現在値をリアルタイムで表示する場所。
            main.jsのdimSlider.addEventListener('input', ...)が

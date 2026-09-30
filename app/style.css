@@ -6,9 +6,11 @@ html, body {
   overflow: hidden;
 }
 
+/* 画面左上に固定し、大きさはmain.jsのresize()が「パネルとエネルギーグラフを除いた領域」に合わせる（decisions.md A-9） */
 #canvas {
-  display: block;
-  margin: 0 auto;
+  position: fixed;
+  top: 0;
+  left: 0;
 }
 
 #hud {
@@ -27,6 +29,21 @@ html, body {
      クリックを奪ってしまう（見た目には#panelは半透明なので気づきにくい）。
      z-indexで常にこのボタンを手前に固定する。 */
   z-index: 10;
+}
+
+/* Day7で追加：一時停止ボタン。#resetの左隣に置く。z-indexの理由は#resetと同じ */
+#pause {
+  position: fixed;
+  top: 8px;
+  right: 90px;
+  z-index: 10;
+}
+
+/* Day7で追加：プリセットボタンを折り返しながら横に並べる */
+#presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 /* コントロールパネルの外枠。
